@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseTrack HRV Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            min-height: 100vh;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+        .video-placeholder {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .metric-card {
+            transition: all 0.3s ease;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            background: white;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .phone-device {
+            position: relative;
+            width: 240px;
+            height: 480px;
+            margin: 0 auto;
+            border-radius: 30px;
+            background: #0f172a;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+        .phone-screen {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            background: #1e293b;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        .camera-module {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #334155;
+            width: 90px;
+            height: 30px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .camera-lens {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #0f172a;
+            position: relative;
+        }
+        .flash {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #475569;
+        }
+        .finger {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 180px;
+            background: linear-gradient(to bottom, #ffd1b3 0%, #ffb88c 100%);
+            border-radius: 60px 60px 30px 30px;
+            z-index: 20;
+        }
+        .finger-tip {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background: #ff9e6d;
+            border-radius: 50px 50px 30px 30px;
+        }
+        .light-beam {
+            position: absolute;
+            top: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 180px;
+            background: radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,0,0,0) 70%);
+            border-radius: 50%;
+            z-index: 10;
+            animation: glow 2s infinite alternate;
+        }
+        @keyframes glow {
+            from { opacity: 0.5; }
+            to { opacity: 0.8; }
+        }
+        .ppg-signal {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 80px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .pulse-wave {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                90deg,
+                transparent,
+                transparent 20px,
+                rgba(99, 102, 241, 0.2) 20px,
+                rgba(99, 102, 241, 0.2) 40px
+            );
+            mask: linear-gradient(90deg, transparent 0%, white 20%, white 80%, transparent 100%);
+        }
+        .signal-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #6366f1;
+            animation: moveWave 3s linear infinite;
+        }
+        @keyframes moveWave {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .signal-peak {
+            position: absolute;
+            width: 4px;
+            height: 20px;
+            background: #6366f1;
+            border-radius: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            animation: peakPulse 1.5s infinite;
+        }
+        @keyframes peakPulse {
+            0%, 100% { height: 20px; }
+            50% { height: 40px; }
+        }
+        .gradient-btn {
+            background: linear-gradient(to right, #6366f1, #8b5cf6);
+            color: white;
+            font-weight: 500;
+            border-radius: 9999px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
+        }
+        .gradient-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 14px rgba(99, 102, 241, 0.4);
+        }
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #818cf8;
+            background: rgba(199, 210, 254, 0.1);
+        }
+        .camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 shadow-md">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-white bg-opacity-20 flex items-center justify-center mr-3">
+                        <i class="fas fa-heart-pulse text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold">PulseTrack</h1>
+                </div>
+                <button class="p-2 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30 transition-all" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+            <p class="text-indigo-200 text-sm mt-2">Heart Rate Variability Analysis</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="p-5 space-y-6">
+            <!-- Mode Selection -->
+            <section id="modeSelection" class="space-y-5">
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-gray-800">Measure Your HRV</h2>
+                    <p class="text-gray-600 mt-2">Assess stress levels and cardiovascular health</p>
+                </div>
+                
+                <div class="bg-white rounded-xl p-5 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">Select Measurement Mode</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button class="mode-btn bg-white p-4 rounded-xl shadow flex flex-col items-center justify-center border-2 border-indigo-100 transition-all hover:border-indigo-300 hover:bg-indigo-50" data-mode="live">
+                            <div class="bg-indigo-100 p-3 rounded-full mb-3">
+                                <i class="fas fa-video text-indigo-600 text-2xl"></i>
+                            </div>
+                            <span class="font-semibold text-indigo-700">Live Camera</span>
+                            <p class="text-xs text-gray-500 mt-1">Real-time analysis</p>
+                        </button>
+                        <button class="mode-btn bg-white p-4 rounded-xl shadow flex flex-col items-center justify-center border-2 border-indigo-100 transition-all hover:border-indigo-300 hover:bg-indigo-50" data-mode="upload">
+                            <div class="bg-indigo-100 p-3 rounded-full mb-3">
+                                <i class="fas fa-file-upload text-indigo-600 text-2xl"></i>
+                            </div>
+                            <span class="font-semibold text-indigo-700">Upload Video</span>
+                            <p class="text-xs text-gray-500 mt-1">Process recordings</p>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl p-5 shadow-sm">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">How It Works</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="bg-indigo-100 text-indigo-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">
+                                <span class="font-bold">1</span>
+                            </div>
+                            <p class="text-gray-600">Place your fingertip over your phone's camera and flash</p>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="bg-indigo-100 text-indigo-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">
+                                <span class="font-bold">2</span>
+                            </div>
+                            <p class="text-gray-600">The app detects blood flow changes using photoplethysmography (PPG)</p>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="bg-indigo-100 text-indigo-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">
+                                <span class="font-bold">3</span>
+                            </div>
+                            <p class="text-gray-600">We analyze heart rate variability to assess stress and recovery</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Camera Preview -->
+            <section id="cameraPreview" class="hidden">
+                <div class="text-center mb-5">
+                    <h2 class="text-xl font-bold text-gray-800">Live Measurement</h2>
+                    <p class="text-gray-600">Cover both camera and flash with your fingertip</p>
+                </div>
+                
+                <div class="relative mb-6">
+                    <div class="phone-device">
+                        <div class="phone-screen">
+                            <div class="camera-module">
+                                <div class="flash"></div>
+                                <div class="camera-lens"></div>
+                            </div>
+                            <div class="light-beam"></div>
+                            <div class="finger">
+                                <div class="finger-tip"></div>
+                            </div>
+                            <div class="ppg-signal">
+                                <div class="pulse-wave"></div>
+                                <div class="signal-line"></div>
+                                <div class="signal-peak" style="left: 20%"></div>
+                                <div class="signal-peak" style="left: 40%"></div>
+                                <div class="signal-peak" style="left: 60%"></div>
+                                <div class="signal-peak" style="left: 80%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="absolute top-0 left-0 right-0 bottom-0 flex items-center justify-center pointer-events-none">
+                        <div class="text-center bg-black bg-opacity-50 text-white rounded-lg p-4 max-w-[80%]">
+                            <div class="inline-block bg-red-500 rounded-full pulse-animation mb-2">
+                                <i class="fas fa-fingerprint text-white text-xl p-3"></i>
+                            </div>
+                            <p class="font-medium">Place finger on camera lens</p>
+                            <p class="text-sm mt-1">Ensure complete coverage of camera and flash</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center">
+                    <button id="startAnalysis" class="gradient-btn px-8 py-3 font-medium flex items-center">
+                        <i class="fas fa-play-circle mr-2"></i>
+                        Start Analysis
+                    </button>
+                </div>
+            </section>
+
+            <!-- Video Upload -->
+            <section id="videoUpload" class="hidden">
+                <div class="text-center mb-5">
+                    <h2 class="text-xl font-bold text-gray-800">Upload Video</h2>
+                    <p class="text-gray-600">Process a pre-recorded fingertip video</p>
+                </div>
+                
+                <div class="upload-area rounded-xl p-8 text-center cursor-pointer" id="uploadContainer">
+                    <div class="bg-indigo-100 inline-flex p-4 rounded-full mb-4">
+                        <i class="fas fa-cloud-upload-alt text-indigo-600 text-3xl"></i>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 text-lg mb-2">Upload Finger Video</h3>
+                    <p class="text-gray-600 mb-4">Drag & drop or click to select video file</p>
+                    <p class="text-xs text-gray-500 mb-4">Supported formats: MP4, MOV, AVI</p>
+                    <label for="videoInput" class="gradient-btn px-6 py-2 inline-block cursor-pointer">
+                        <i class="fas fa-folder-open mr-2"></i>
+                        Browse Files
+                    </label>
+                    <input type="file" id="videoInput" accept="video/*" class="hidden">
+                    
+                    <div class="mt-6">
+                        <div class="bg-gray-50 rounded-xl p-4 hidden" id="uploadDetails">
+                            <div class="flex justify-between items-center text-sm mb-2">
+                                <span class="font-medium text-gray-800" id="fileName">sample_video.mp4</span>
+                                <span class="text-gray-500" id="fileSize">12.4 MB</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div class="bg-gradient-to-r from-indigo-500 to-purple-500 h-2.5 rounded-full" style="width: 0%" id="uploadProgress"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Processing Screen -->
+            <section id="processingScreen" class="hidden">
+                <div class="text-center mb-5">
+                    <h2 class="text-xl font-bold text-gray-800">Processing Data</h2>
+                    <p class="text-gray-600">Analyzing your pulse waveform</p>
+                </div>
+                
+                <div class="rounded-xl bg-white p-8 text-center shadow-md">
+                    <div class="mb-6">
+                        <div class="inline-flex items-center justify-center">
+                            <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-indigo-600"></div>
+                            <i class="fas fa-heartbeat text-indigo-600 text-2xl ml-3"></i>
+                        </div>
+                    </div>
+                    <h3 class="font-semibold text-gray-800 text-lg mb-2">Analyzing Your Pulse</h3>
+                    <p class="text-gray-600 mb-6">This typically takes 15-30 seconds</p>
+                    
+                    <div class="relative pt-1 mb-6">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Progress</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="overflow-hidden h-3 mb-4 flex rounded bg-gray-200">
+                            <div id="processingProgress" style="width:0%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-gray-600 text-sm" id="processingStatus">
+                        <i class="fas fa-sync-alt animate-spin mr-2"></i>
+                        Initializing analysis...
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Screen -->
+            <section id="resultsScreen" class="hidden">
+                <div class="text-center mb-5">
+                    <h2 class="text-xl font-bold text-gray-800">Analysis Results</h2>
+                    <p class="text-gray-600">Your heart rate variability metrics</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-5 flex justify-between items-center">
+                        <div>
+                            <h3 class="font-semibold text-lg">Cardiovascular Report</h3>
+                            <p class="text-indigo-200 text-sm">Just now • 30 seconds measurement</p>
+                        </div>
+                        <span class="status-badge bg-white bg-opacity-20">
+                            <i class="fas fa-check-circle mr-1"></i>
+                            Completed
+                        </span>
+                    </div>
+                    
+                    <div class="p-5 border-b">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <h4 class="font-medium text-gray-800">Heart Rate</h4>
+                                <p class="text-xs text-gray-500">Beats per minute</p>
+                            </div>
+                            <div class="flex items-end">
+                                <div class="text-4xl font-bold text-indigo-600" id="heartRate">75</div>
+                                <span class="text-gray-500 ml-1 mb-2">BPM</span>
+                            </div>
+                        </div>
+                        
+                        <div class="relative h-52">
+                            <canvas id="pulseChart"></canvas>
+                        </div>
+                        
+                        <div class="flex justify-between text-xs text-gray-500 mt-2">
+                            <span>0s</span>
+                            <span>15s</span>
+                            <span>30s</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-5">
+                        <h4 class="font-semibold text-gray-800 mb-4">HRV Metrics</h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="metric-card p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-500">RMSSD</span>
+                                    <span class="status-badge bg-blue-100 text-blue-800">HRV</span>
+                                </div>
+                                <div class="text-2xl font-bold text-gray-800" id="rmssdValue">69.63</div>
+                                <div class="text-xs text-gray-500 mt-1">ms (higher is better)</div>
+                            </div>
+                            
+                            <div class="metric-card p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-500">SDNN</span>
+                                    <span class="status-badge bg-blue-100 text-blue-800">HRV</span>
+                                </div>
+                                <div class="text-2xl font-bold text-gray-800" id="sdnnValue">0.04</div>
+                                <div class="text-xs text-gray-500 mt-1">s (total variability)</div>
+                            </div>
+                            
+                            <div class="metric-card p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-500">LF/HF Ratio</span>
+                                    <span class="status-badge bg-purple-100 text-purple-800">Balance</span>
+                                </div>
+                                <div class="text-2xl font-bold text-gray-800" id="lfhfValue">0.24</div>
+                                <div class="text-xs text-gray-500 mt-1">sympathetic/parasympathetic</div>
+                            </div>
+                            
+                            <div class="metric-card p-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm font-medium text-gray-500">Anxiety Risk</span>
+                                    <span class="status-badge bg-green-100 text-green-800">Status</span>
+                                </div>
+                                <div class="text-2xl font-bold text-green-600" id="anxietyStatus">Relaxed</div>
+                                <div class="text-xs text-gray-500 mt-1">✅ Low anxiety detected</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-5 bg-indigo-50 rounded-xl p-4">
+                            <div class="flex items-start">
+                                <div class="bg-indigo-100 text-indigo-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">
+                                    <i class="fas fa-lightbulb"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold text-gray-800">Interpretation</h4>
+                                    <p class="text-gray-600 text-sm mt-1">Your HRV metrics indicate a relaxed state with good autonomic balance. Maintain your current routine for optimal cardiovascular health.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 bg-gray-50 flex justify-between">
+                        <button class="text-indigo-600 font-medium flex items-center hover:text-indigo-800">
+                            <i class="fas fa-download mr-2"></i>
+                            Export Report
+                        </button>
+                        <button class="gradient-btn px-5 py-2 font-medium flex items-center" id="newAnalysisBtn">
+                            <i class="fas fa-redo mr-2"></i>
+                            New Analysis
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="p-5 text-center text-gray-600 text-sm border-t">
+            <p>PulseTrack HRV Analyzer • Uses photoplethysmography (PPG) technology</p>
+            <p class="mt-1">Results are for informational purposes only</p>
+        </footer>
+    </div>
+
+    <script>
+        // UI State Management
+        const views = {
+            mode: document.getElementById('modeSelection'),
+            camera: document.getElementById('cameraPreview'),
+            upload: document.getElementById('videoUpload'),
+            processing: document.getElementById('processingScreen'),
+            results: document.getElementById('resultsScreen')
+        };
+
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const videoInput = document.getElementById('videoInput');
+        const uploadContainer = document.getElementById('uploadContainer');
+        const uploadDetails = document.getElementById('uploadDetails');
+        const progressPercent = document.getElementById('progressPercent');
+        const processingProgress = document.getElementById('processingProgress');
+        const processingStatus = document.getElementById('processingStatus');
+        const startAnalysisBtn = document.getElementById('startAnalysis');
+        const newAnalysisBtn = document.getElementById('newAnalysisBtn');
+        
+        // Variables for camera access
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        
+        // Pulse chart instance
+        let pulseChart = null;
+
+        // Event Listeners
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const mode = this.getAttribute('data-mode');
+                hideAllViews();
+                
+                if (mode === 'live') {
+                    views.camera.classList.remove('hidden');
+                    initCamera();
+                } else {
+                    views.upload.classList.remove('hidden');
+                }
+            });
+        });
+
+        uploadContainer.addEventListener('click', () => {
+            videoInput.click();
+        });
+
+        videoInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileSize').textContent = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+                uploadDetails.classList.remove('hidden');
+                
+                // Simulate upload progress
+                let progress = 0;
+                const uploadInterval = setInterval(() => {
+                    progress += 5;
+                    document.getElementById('uploadProgress').style.width = `${progress}%`;
+                    
+                    if (progress >= 100) {
+                        clearInterval(uploadInterval);
+                        startProcessing(file);
+                    }
+                }, 100);
+            }
+        });
+
+        startAnalysisBtn.addEventListener('click', startProcessing);
+        newAnalysisBtn.addEventListener('click', () => {
+            hideAllViews();
+            views.mode.classList.remove('hidden');
+            resetUI();
+            stopCamera();
+        });
+
+        function hideAllViews() {
+            Object.values(views).forEach(view => view.classList.add('hidden'));
+        }
+
+        function resetUI() {
+            document.getElementById('uploadProgress').style.width = '0%';
+            processingProgress.style.width = '0%';
+            progressPercent.textContent = '0%';
+            uploadDetails.classList.add('hidden');
+        }
+        
+        // Initialize camera for live mode
+        async function initCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
+                
+                // Create camera preview
+                const preview = document.createElement('video');
+                preview.srcObject = mediaStream;
+                preview.autoplay = true;
+                preview.muted = true;
+                preview.playsInline = true;
+                preview.classList.add('camera-feed');
+                
+                // Replace the phone device with live camera feed
+                const phoneScreen = document.querySelector('.phone-screen');
+                phoneScreen.innerHTML = '';
+                phoneScreen.appendChild(preview);
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Camera access failed. Please ensure you have granted permission and try again.');
+            }
+        }
+        
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+        }
+        
+        // Start processing for both live and upload modes
+        function startProcessing(videoFile) {
+            hideAllViews();
+            views.processing.classList.remove('hidden');
+            
+            // Create FormData to send the video file
+            const formData = new FormData();
+            formData.append('video', videoFile);
+            
+            // Simulate processing
+            let progress = 0;
+            const processingInterval = setInterval(() => {
+                progress += 2;
+                processingProgress.style.width = `${progress}%`;
+                progressPercent.textContent = `${progress}%`;
+                
+                if (progress <= 30) {
+                    processingStatus.innerHTML = '<i class="fas fa-sync-alt animate-spin mr-2"></i> Initializing video processing...';
+                } else if (progress <= 60) {
+                    processingStatus.innerHTML = '<i class="fas fa-wave-square mr-2"></i> Analyzing pulse waveform...';
+                } else if (progress <= 90) {
+                    processingStatus.innerHTML = '<i class="fas fa-calculator mr-2"></i> Calculating HRV metrics...';
+                } else {
+                    processingStatus.innerHTML = '<i class="fas fa-tasks mr-2"></i> Finalizing results...';
+                }
+                
+                if (progress >= 100) {
+                    clearInterval(processingInterval);
+                    
+                    // Send to backend for processing
+                    fetch('/analyze', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Analysis failed');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.error) {
+                            throw new Error(data.error);
+                        }
+                        showResults(data);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        processingStatus.innerHTML = `<i class="fas fa-exclamation-triangle mr-2"></i> ${error.message}`;
+                    });
+                }
+            }, 100);
+        }
+
+        function showResults(data) {
+            hideAllViews();
+            views.results.classList.remove('hidden');
+            
+            // Update UI with results
+            document.getElementById('heartRate').textContent = data.bpm.toFixed(2);
+            document.getElementById('rmssdValue').textContent = data.rmssd_ms ? data.rmssd_ms.toFixed(2) : 'N/A';
+            document.getElementById('sdnnValue').textContent = data.sdnn ? data.sdnn.toFixed(2) : 'N/A';
+            document.getElementById('lfhfValue').textContent = data.lf_hf_ratio ? data.lf_hf_ratio.toFixed(2) : 'N/A';
+            document.getElementById('anxietyStatus').textContent = data.anxiety_risk || 'N/A';
+            
+            // Initialize or update the chart
+            if (data.pulse_data && data.times) {
+                initChart(data.pulse_data, data.times);
+            }
+        }
+
+        // Initialize pulse chart
+        function initChart(pulseData, times) {
+            const ctx = document.getElementById('pulseChart').getContext('2d');
+            
+            // Destroy previous chart instance if exists
+            if (pulseChart) {
+                pulseChart.destroy();
+            }
+            
+            pulseChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: times,
+                    datasets: [{
+                        label: 'Pulse Waveform',
+                        data: pulseData,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { mode: 'index', intersect: false }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time (s)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Amplitude'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize the chart with empty data
+            initChart([], []);
+        });
+    </script>
+</body>
+</html>
